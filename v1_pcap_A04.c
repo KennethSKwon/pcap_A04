@@ -1,20 +1,15 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
+//HEADERS
 #include <stdio.h>
-#include <netinet/if_ether.h>
+#include <stdlib.h>
 #include <string.h>
+#include <netinet/if_ether.h>
+#include <pcap.h>
+#include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <ifaddrs.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <pcap.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -22,12 +17,18 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <linux/tcp.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 
 u_char* _get_mymac(u_char *dev_str);
 u_char* _get_myip(u_char *dev_str);
 u_char* _ip_string_to_bytes(u_char *ip_str);
-void _send_arp(u_char *dst_mac,u_char *src_mac,u_char *target_ip,u_char *sender_ip,u_char *target_mac, u_char *sender_mac, u_short _opcode);
+void _send_arp(u_char *dev_str,u_char *dst_mac,u_char *src_mac,u_char *target_ip,u_char *sender_ip,u_char *target_mac, u_char *sender_mac, u_short _opcode);
 u_char* _detect_mac(u_char *dev_str,u_char *chk_ip);
+u_char* thread_detect_mac(u_char *chk_ip);
+
 
 int main(int argc, char *argv[]){
 //START: error HOW TO USE
@@ -49,28 +50,57 @@ int main(int argc, char *argv[]){
 
 
 	printf("==================\n");
-
 //START: MY MAC
 	u_char *_mymac;
 	_mymac=_get_mymac(dev_str);
-
 //START: MY IP
 	u_char *_myip;
 	_myip=_get_myip(dev_str);
-
 //START: GET TARGET MAC with ARP reqeust
+	pthread_t t_id[argc-2];
+	u_char thread_param=0;
+	u_char *thr_ret;
+
 
 	//argv[2]'s mac = argv_ip[0]'s mac
 	#define ARP_BROAD "\xff\xff\xff\xff\xff\xff"
 	#define ARP_DEFAULT_TMAC "\x00\x00\x00\x00\x00\x00"
-	_send_arp(ARP_BROAD,_mymac,argv_ip[0],_myip,ARP_DEFAULT_TMAC,_mymac,0x0001);
+	
 	u_char *argv_mac[argc-2];
-	argv_mac[0]=_detect_mac(dev_str,argv_ip[0]); // argv_ip[0] for figure out where it's right mac or not
+	memset(argv_mac,0,sizeof(argv_mac));
 
+	while(1){		
+		pthread_create(&t_id,NULL,thread_detect_mac,argv_ip[0]);
+		_send_arp(dev_str,ARP_BROAD,_mymac,argv_ip[0],_myip,ARP_DEFAULT_TMAC,_mymac,0x0001);
+		pthread_join(t_id,&argv_mac[0]);	
+		if(argv_mac[0]!=NULL){
+			printf("NULL00\n");
+			break;
+		}
+	}
+
+/*
+	argv_mac[0]=_detect_mac(dev_str,argv_ip[0]);
+	printf("ARGV MAC[0]: ");
+	for(int i=0; i<4; i++){
+		printf("[%02x]", argv_mac[0][i]);
+	} printf("\n");
+*/
+
+		
+	
 
 
 }
+u_char* thread_detect_mac(u_char *chk_ip){
+	u_char *get_mac;
 
+	get_mac=_detect_mac("ens33",chk_ip);
+	printf("THREAD MAC: ");
+	for(int i=0; i<6; i++){
+		printf("[%02x]",get_mac[i]);
+	}printf("\n");	
+}
 
 
 u_char* _get_mymac(u_char *dev_str){
@@ -91,7 +121,6 @@ u_char* _get_mymac(u_char *dev_str){
 
     return _mymac;
 }
-
 u_char* _get_myip(u_char *dev_str){
 	struct ifaddrs *ifaddr, *ifa;
     int family, s;
@@ -125,7 +154,6 @@ u_char* _get_myip(u_char *dev_str){
     freeifaddrs(ifaddr);
     return _ip_string_to_bytes(host);
 }
-
 u_char* _ip_string_to_bytes(u_char *ip_str){
 	static u_char _ip[4];
 	const char tk[2] = ".";	
@@ -147,8 +175,7 @@ u_char* _ip_string_to_bytes(u_char *ip_str){
 	
 	return  _ip;
 }
-
-void _send_arp(u_char *dst_mac,u_char *src_mac,u_char *target_ip,u_char *sender_ip,u_char *target_mac, u_char *sender_mac, u_short _opcode){
+void _send_arp(u_char *dev_str,u_char *dst_mac,u_char *src_mac,u_char *target_ip,u_char *sender_ip,u_char *target_mac, u_char *sender_mac, u_short _opcode){
 	u_char buffer[80];
     struct ether_header *_eth=(struct ether_header*)buffer;
     struct ether_arp *_arp=(struct ether_arp*)(buffer+sizeof(struct ether_header));
@@ -167,13 +194,22 @@ void _send_arp(u_char *dst_mac,u_char *src_mac,u_char *target_ip,u_char *sender_
     memcpy(_arp->arp_spa, sender_ip,4);
     memcpy(_arp->arp_tha, target_mac,6);
     memcpy(_arp->arp_tpa, target_ip,4);
-
+/*
     for(int i=0; i<sizeof(struct ether_header)+sizeof(struct ether_arp); i++){
     	if(i%16==0) printf("\n");
     	printf("[%02x]",buffer[i]);
     } printf("\n");
-}
+*/
+	pcap_t *s_handle;
+	u_char *s_packet;
+	struct pcap_pkthdr *header;
+	char errbuf[PCAP_ERRBUF_SIZE];
 
+	if (dev_str == NULL) { fprintf(stderr, "Couldn't find default device: %s\n", errbuf); return(2); }
+	s_handle = pcap_open_live(dev_str, BUFSIZ, 1, 1000, errbuf);
+	if (s_handle == NULL) { fprintf(stderr, "Couldn't open device %s: %s\n", dev_str, errbuf); return(2); }
+    pcap_sendpacket(s_handle, buffer, sizeof(struct ether_header)+sizeof(struct ether_arp));
+}
 u_char* _detect_mac(u_char *dev_str,u_char *chk_ip){
 	pcap_t *handle;
 	u_char *packet;
@@ -182,27 +218,26 @@ u_char* _detect_mac(u_char *dev_str,u_char *chk_ip){
 	struct pcap_pkthdr *header;
 	static u_char *get_mac;
 	handle = pcap_open_live(dev_str, BUFSIZ, 1, 1000, errbuf);
-	chk_packet = pcap_next_ex(handle, &header,&packet);
-	if(chk_packet==0){
-			printf("chk_packet=0\n");
-			return -1;
-	}
-	else if(chk_packet==1){
-		struct ether_header *_eth=(struct ether_header*)(packet);
-		struct ether_arp *_arp=(struct ether_arp*)(packet+sizeof(struct ether_header));
+	while(1){
+		chk_packet = pcap_next_ex(handle, &header,&packet);
+		if(chk_packet==0){
+				printf("chk_packet=0\n");
+				return -1;
+		}
+		else if(chk_packet==1){
+			struct ether_header *_eth=(struct ether_header*)(packet);
+			struct ether_arp *_arp=(struct ether_arp*)(packet+sizeof(struct ether_header));
 
-		if(ntohs(_eth->ether_type)==0x0806){
-			printf("*ARP REPLY*\n");
-			if(strcmp(_arp->arp_spa,chk_ip)!=0){
-				printf("*GET MAC*\n");
-				return get_mac;
-
+			if(ntohs(_eth->ether_type)==0x0806&&ntohs(_arp->arp_op)==0x0002&&(strcmp(_arp->arp_spa,chk_ip)!=0)){
+				printf("*GET ARP REPLY*\n");
+					return get_mac=_arp->arp_sha;
+				
 			}
 		}
-	}
-	else{
-		printf("ck_packout wrong -1(Device down) or -2(EOF)\n");
-		return -1;
+		else{
+			printf("ck_packout wrong -1(Device down) or -2(EOF)\n");
+			return -1;
+		}
 	}
     return 0;
 }
