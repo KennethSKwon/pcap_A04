@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,16 +69,15 @@ int main(int argc, int *argv[]){
 
 
 
-/*
-	for(int i=0; i<6;i++){
-		printf("[%02x]",_mymac[i]);
-	}
-*/
 
+
+	int r=0;
 	int k=0;
+	u_char buff[80];
 	handle = pcap_open_live(dev_str, BUFSIZ, 1, 1000, errbuf);
 	while(1){
 		chk_packet = pcap_next_ex(handle, &header,&packet);
+		memcpy(buff,packet,80);
 		_packet_pointer=0;
 		if(chk_packet==0){
 				printf("chk_packet=0\n");
@@ -87,14 +87,8 @@ int main(int argc, int *argv[]){
 			_eth=(struct ether_header*)(packet);
 			_packet_pointer+=sizeof(struct ether_header);
 
-// START : DATA LINK LAYER
-			/*
-			printf("================DATA LINK Layer=======================\n");
-			printf("dst MAC : %s\n", ether_ntoa((struct ether_header*) _eth->ether_dhost));
-			printf("src MAC : %s\n", ether_ntoa((struct ether_header*) _eth->ether_shost));
-			printf("Type    : %04x\n\n", ntohs(_eth->ether_type));
 			//printf("=====================================================\n");
-			*/
+
 // END : DATA LINK LAYER	
 
 // START : NETWORK LAYER
@@ -125,21 +119,88 @@ int main(int argc, int *argv[]){
 					printf("*OK*\n");
 				}
 				*/
+			
+				if(_ip->ip_p==0x01)
+					printf("condition 1: [%d]\n",r++);
+				if(memcmp(_eth->ether_dhost,_mymac,6)){
+					printf("condition 2: [%d]\n",r++);
+					for(int i=0; i<6; i++)
+						printf("[%02x]",_mymac[i]);
+					printf("\n");
+					for(int i=0; i<6; i++)
+						printf("[%02x]",_eth->ether_dhost);
+					
+				}
+				if(strcmp(ip_str2,inet_ntoa( _ip->ip_dst))==0)
+					printf("condition 3: [%d]\n",r++);
 
-				if(_ip->ip_p==0x01&&memcmp(_eth->ether_dhost,_mymac,6)&&strcmp(ip_str2,inet_ntoa( _ip->ip_dst))==0){
-					printf("protocol[%02x]\n",_ip->ip_p);
-					printf("&&&&&&&[%d]&&&&&&&&\n",k++);
+				//_ip->ip_p==0x01&&
+				if(memcmp(_eth->ether_dhost,_mymac,6)&&strcmp(ip_str2,inet_ntoa( _ip->ip_dst))==0){
+					//printf("protocol[%02x]\n",_ip->ip_p);
+					printf("&&&&&&&[%d]&&&&&&&&\n",(k++)+1);
+// START : DATA LINK LAYER
 /*
-					struct ether_header *tmp;
-					tmp->ether_dhost=_eth->ether_dhost;
-					_eth->ether_dhost=_eth->ether_shost;
-					_eth->ether_shost=tmp->eth->ether_dhost;
+	printf("packet:\n");
+	for(int i=0; i<80;i++){
+		printf("[%02x]",packet[i]);
+	} printf("\n");
+
+	printf("\nbuff:\n");
+	for(int i=0; i<80;i++){
+		//buff[i]=0x00;
+		printf("[%02x]",buff[i]);
+	} printf("\n");
 */
+	memcpy(buff,_eth->ether_shost,6);
+	memcpy(buff+6,_eth->ether_dhost,6);
+/*	
+	printf("\nbuff_after:\n");
+	for(int i=0; i<80;i++){
+		//buff[i]=0x00;
+		printf("[%02x]",buff[i]);
+	} printf("\n");
+*/
+	pcap_sendpacket(handle, buff, 80);
+
+/*
+
+			printf("================DATA LINK Layer=======================\n");
+			printf("dst MAC : %s\n", ether_ntoa((struct ether_header*) _eth->ether_dhost));
+			printf("src MAC : %s\n", ether_ntoa((struct ether_header*) _eth->ether_shost));
+			printf("Type    : %04x\n\n", ntohs(_eth->ether_type));
+
+
+
+					u_char tmp_buf[80];
+					struct ether_header *tmp=(struct ether_header*)tmp_buf;
+
+					printf("1>%s\n",ether_ntoa((struct ether_header*) tmp->ether_dhost));
+					printf("1>%s\n",ether_ntoa((struct ether_header*) _eth->ether_dhost));
+					printf("1>%s\n",ether_ntoa((struct ether_header*) _eth->ether_shost));
+
+					memcpy(tmp->ether_dhost,_eth->ether_dhost,6);
+					memcpy(tmp->ether_dhost,_eth->ether_shost,6);
+					memcpy(tmp->ether_shost,tmp->ether_dhost,6);
+					//strcpy(ether_ntoa((struct ether_header*) tmp->ether_dhost),ether_ntoa((struct ether_header*) _eth->ether_dhost));
+					printf("2>%s\n",ether_ntoa((struct ether_header*) tmp->ether_dhost));
+					printf("2>%s\n",ether_ntoa((struct ether_header*) _eth->ether_dhost));
+					printf("2>%s\n",ether_ntoa((struct ether_header*) _eth->ether_shost));
+//					_eth->ether_dhost=_eth->ether_shost;
+//					_eth->ether_shost=tmp->eth->ether_dhost;
+*/
+/*
 					u_char tmp[6];
 					memcpy(tmp,_eth->ether_dhost,6);
+*/
 
 					//send_packet()	
 				}			
+				if(memcmp(_eth->ether_dhost,_mymac,6)&&strcmp(ip_str1,inet_ntoa( _ip->ip_dst))==0){
+
+						memcpy(buff,_eth->ether_shost,6);
+						memcpy(buff+6,_eth->ether_dhost,6);
+
+				}
 			}
 
 // END : NETWORK LAYER
